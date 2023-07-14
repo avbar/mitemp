@@ -17,12 +17,12 @@ var (
 )
 
 type Handler struct {
-	sensor Sensor
+	sensors []Sensor
 }
 
-func NewHandler(sensor Sensor) (*Handler, error) {
+func NewHandler(sensors []Sensor) (*Handler, error) {
 	h := &Handler{
-		sensor: sensor,
+		sensors: sensors,
 	}
 
 	d, err := linux.NewDevice()
@@ -46,14 +46,14 @@ func (h *Handler) handleReading(ch chan<- Reading) func([]byte) {
 	}
 }
 
-func (h *Handler) GetReading() (Reading, error) {
-	log.Printf("getting readings for %q", h.sensor.Name)
+func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
+	log.Printf("getting readings for %q", sensor.Name)
 
 	var r Reading
 
 	// Filter sensor by MAC address
 	filter := func(a ble.Advertisement) bool {
-		return strings.EqualFold(a.Addr().String(), h.sensor.MAC)
+		return strings.EqualFold(a.Addr().String(), sensor.MAC)
 	}
 
 	// Scan for specified duration, or until interrupted by user
@@ -63,7 +63,7 @@ func (h *Handler) GetReading() (Reading, error) {
 	if err != nil {
 		return r, err
 	}
-	log.Printf("connected to %q", h.sensor.Name)
+	log.Printf("connected to %q", sensor.Name)
 
 	done := make(chan struct{})
 
@@ -72,7 +72,7 @@ func (h *Handler) GetReading() (Reading, error) {
 	// So we wait(detect) the disconnection in the go routine.
 	go func() {
 		<-cln.Disconnected()
-		log.Printf("disconnected from %q", h.sensor.Name)
+		log.Printf("disconnected from %q", sensor.Name)
 		close(done)
 	}()
 
@@ -103,4 +103,15 @@ func (h *Handler) GetReading() (Reading, error) {
 	<-done
 
 	return r, nil
+}
+
+func (h *Handler) Handle() {
+	for _, sensor := range h.sensors {
+		r, err := h.GetReading(sensor)
+		if err != nil {
+			log.Print("error getting readings: ", err)
+		} else {
+			log.Printf("%q readings: %+v", sensor.Name, r)
+		}
+	}
 }

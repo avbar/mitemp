@@ -1,8 +1,8 @@
 package handler
 
 type Sensor struct {
-	Name string
-	MAC  string
+	Name string `yaml:"name"`
+	MAC  string `yaml:"mac"`
 }
 
 type Reading struct {
