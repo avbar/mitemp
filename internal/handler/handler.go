@@ -3,17 +3,21 @@ package handler
 import (
 	"context"
 	"encoding/binary"
-	"log"
 	"strings"
 	"time"
 
+	"github.com/avbar/mitemp/internal/logger"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
+	"go.uber.org/zap"
 )
 
 var (
 	// UUID of sensor characteristic with temperature/humidity/voltage
 	tempUUID = ble.MustParse("ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6")
+
+	readingTimeout = 15 * time.Second
+	readingPause   = 10 * time.Second
 )
 
 type Handler struct {
@@ -25,10 +29,12 @@ func NewHandler(sensors []Sensor) (*Handler, error) {
 		sensors: sensors,
 	}
 
+	logger.Info("creating device")
 	d, err := linux.NewDevice()
 	for err != nil {
 		return nil, err
 	}
+	logger.Info("device created")
 	ble.SetDefaultDevice(d)
 
 	return h, nil
@@ -47,7 +53,7 @@ func (h *Handler) handleReading(ch chan<- Reading) func([]byte) {
 }
 
 func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
-	log.Printf("getting readings for %q", sensor.Name)
+	logger.Info("getting readings", zap.String("sensor", sensor.Name))
 
 	var r Reading
 
@@ -57,13 +63,13 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	}
 
 	// Scan for specified duration, or until interrupted by user
-	log.Print("connecting...")
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), 20*time.Second))
+	logger.Debug("connecting...", zap.String("sensor", sensor.Name))
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), readingTimeout))
 	cln, err := ble.Connect(ctx, filter)
 	if err != nil {
 		return r, err
 	}
-	log.Printf("connected to %q", sensor.Name)
+	logger.Debug("connected", zap.String("sensor", sensor.Name))
 
 	done := make(chan struct{})
 
@@ -72,20 +78,20 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	// So we wait(detect) the disconnection in the go routine.
 	go func() {
 		<-cln.Disconnected()
-		log.Printf("disconnected from %q", sensor.Name)
+		logger.Debug("disconnected", zap.String("sensor", sensor.Name))
 		close(done)
 	}()
 
-	log.Print("discovering profile...")
+	logger.Debug("discovering profile...", zap.String("sensor", sensor.Name))
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return r, err
 	}
 
-	log.Print("finding characteristic...")
+	logger.Debug("finding characteristic...", zap.String("sensor", sensor.Name))
 	c := p.FindCharacteristic(ble.NewCharacteristic(tempUUID))
 
-	log.Print("reading data...")
+	logger.Debug("reading data...", zap.String("sensor", sensor.Name))
 	ch := make(chan Reading)
 	err = cln.Subscribe(c, false, h.handleReading(ch))
 	if err != nil {
@@ -98,7 +104,7 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 		return r, nil
 	}
 
-	log.Print("disconnecting...")
+	logger.Debug("disconnecting...", zap.String("sensor", sensor.Name))
 	cln.CancelConnection()
 	<-done
 
@@ -106,12 +112,16 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 }
 
 func (h *Handler) Handle() {
-	for _, sensor := range h.sensors {
-		r, err := h.GetReading(sensor)
-		if err != nil {
-			log.Print("error getting readings: ", err)
-		} else {
-			log.Printf("%q readings: %+v", sensor.Name, r)
+	for {
+		for _, sensor := range h.sensors {
+			r, err := h.GetReading(sensor)
+			if err != nil {
+				logger.Error("error getting readings", zap.Error(err), zap.String("sensor", sensor.Name))
+			} else {
+				logger.Info("readings were taken", zap.String("sensor", sensor.Name), zap.Any("reading", r))
+			}
 		}
+
+		time.Sleep(readingPause)
 	}
 }

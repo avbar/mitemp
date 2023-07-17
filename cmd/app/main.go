@@ -1,28 +1,30 @@
 package main
 
 import (
-	"log"
-	"time"
+	"flag"
 
 	"github.com/avbar/mitemp/internal/config"
 	"github.com/avbar/mitemp/internal/handler"
+	"github.com/avbar/mitemp/internal/logger"
+	"go.uber.org/zap"
 )
 
+var develMode = flag.Bool("devel", true, "development mode")
+
 func main() {
+	flag.Parse()
+
+	logger.Init(*develMode)
+
 	err := config.Init()
 	if err != nil {
-		log.Fatal("config init: ", err)
+		logger.Fatal("config init error", zap.Error(err))
 	}
 
-	log.Print("creating handler")
 	handler, err := handler.NewHandler(config.ConfigData.Sensors)
 	for err != nil {
-		log.Fatal("error creating handler: ", err)
+		logger.Fatal("error creating handler", zap.Error(err))
 	}
-	log.Print("handler created")
 
-	for {
-		handler.Handle()
-		time.Sleep(10 * time.Second)
-	}
+	handler.Handle()
 }
