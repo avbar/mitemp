@@ -44,10 +44,20 @@ func (h *Handler) handleReading(ch chan<- Reading) func([]byte) {
 	return func(b []byte) {
 		// Bytes 0-1 are temperature, byte 2 is humidity, bytes 3-4 are voltage
 		r := Reading{
-			Temperature: float64(binary.LittleEndian.Uint16(b[0:2])) / 100,
-			Humidity:    float64(b[2]),
-			Voltage:     float64(binary.LittleEndian.Uint16(b[3:5])) / 1000,
+			Temperature: float32(binary.LittleEndian.Uint16(b[0:2])) / 100,
+			Humidity:    uint8(b[2]),
+			Voltage:     float32(binary.LittleEndian.Uint16(b[3:5])) / 1000,
 		}
+
+		// Battery level: 3.1V is 100%, 2.1V is 0%
+		battery := (r.Voltage - 2.1) * 100
+		if battery < 0 {
+			battery = 0
+		} else if battery > 100 {
+			battery = 100
+		}
+		r.Battery = uint8(battery)
+
 		ch <- r
 	}
 }

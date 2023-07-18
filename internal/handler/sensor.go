@@ -6,7 +6,8 @@ type Sensor struct {
 }
 
 type Reading struct {
-	Temperature float64
-	Humidity    float64
-	Voltage     float64
+	Temperature float32
+	Humidity    uint8
+	Voltage     float32
+	Battery     uint8
 }
