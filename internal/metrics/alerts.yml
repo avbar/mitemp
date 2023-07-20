@@ -1,0 +1,19 @@
+groups:
+- name: alerts
+  rules:
+  - alert: AppIsDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Application {{ $labels.job }} is down"
+      description: "Instance {{ $labels.instance }} of service {{ $labels.job }} has been down for more than 1 minute"
+  - alert: LowBatteryLevel
+    expr: app_sensors_gauge_battery_percents < 20
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Sensor {{ $labels.sensor }} has low battery level"
+      description: "Sensor {{ $labels.sensor }} has low battery level: {{ $value }}%"

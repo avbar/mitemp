@@ -1,0 +1,19 @@
+# Rename the file to alertmanager.yml and fill bot token and user id
+route:
+  # alert grouping
+  group_by: ['alertname']
+  # time to wait before sending an initial notification
+  group_wait: 10s
+  # time to wait before sending a notification about new alerts for a group
+  group_interval: 1m
+  # time to wait before sending a notification again
+  repeat_interval: 1h
+  receiver: 'telegram'
+receivers:
+  - name: 'telegram'
+    telegram_configs:
+    - bot_token: 'bot_token' # here we specify the bot token
+      api_url: 'https://api.telegram.org'
+      chat_id: chat_id # here we specify the user id
+      message:  "Alertname: {{ .GroupLabels.alertname }}\nSeverity: {{ .CommonLabels.severity }}\n{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+      parse_mode: ''

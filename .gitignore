@@ -1,1 +1,3 @@
 /bin
+/internal/metrics/grafanadata
+/internal/metrics/alertmanager.yml

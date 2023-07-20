@@ -3,3 +3,4 @@ sensors:
     mac:  "a4:c1:38:8c:f7:79"
   - name: "Sensor 2"
     mac:  "a4:c1:38:8a:d6:c2"
+port: 8080

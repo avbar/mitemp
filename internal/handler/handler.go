@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/avbar/mitemp/internal/logger"
+	"github.com/avbar/mitemp/internal/metrics"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
 	"go.uber.org/zap"
@@ -121,6 +122,13 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	return r, nil
 }
 
+func (h *Handler) setMetrics(sensor Sensor, reading Reading) {
+	metrics.GaugeTemperature.WithLabelValues(sensor.Name).Set(float64(reading.Temperature))
+	metrics.GaugeHumidity.WithLabelValues(sensor.Name).Set(float64(reading.Humidity))
+	metrics.GaugeVoltage.WithLabelValues(sensor.Name).Set(float64(reading.Voltage))
+	metrics.GaugeBattery.WithLabelValues(sensor.Name).Set(float64(reading.Battery))
+}
+
 func (h *Handler) Handle() {
 	for {
 		for _, sensor := range h.sensors {
@@ -129,6 +137,7 @@ func (h *Handler) Handle() {
 				logger.Error("error getting readings", zap.Error(err), zap.String("sensor", sensor.Name))
 			} else {
 				logger.Info("readings were taken", zap.String("sensor", sensor.Name), zap.Any("reading", r))
+				h.setMetrics(sensor, r)
 			}
 		}
 

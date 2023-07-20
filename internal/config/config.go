@@ -11,6 +11,7 @@ import (
 
 type ConfigStruct struct {
 	Sensors []handler.Sensor `yaml:"sensors"`
+	Port    int              `yaml:"port"`
 }
 
 var ConfigData ConfigStruct
