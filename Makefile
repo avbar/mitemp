@@ -1,8 +1,8 @@
 build:
-	CGO_ENABLED=0 GOOS=linux go build -a -o ./bin/app github.com/avbar/mitemp/cmd/app
+	docker compose build
 
 up:
-	docker compose up --force-recreate --build
+	docker compose up
 
 run-all:
 	make build
