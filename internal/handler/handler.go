@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ var (
 
 	readingTimeout = 15 * time.Second
 	readingPause   = 10 * time.Second
+
+	ErrDisconnectedByDevice = errors.New("disconnected by device")
 )
 
 type Handler struct {
@@ -66,8 +69,6 @@ func (h *Handler) handleReading(ch chan<- Reading) func([]byte) {
 func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	logger.Info("getting readings", zap.String("sensor", sensor.Name))
 
-	var r Reading
-
 	// Filter sensor by MAC address
 	filter := func(a ble.Advertisement) bool {
 		return strings.EqualFold(a.Addr().String(), sensor.MAC)
@@ -78,7 +79,7 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), readingTimeout))
 	cln, err := ble.Connect(ctx, filter)
 	if err != nil {
-		return r, err
+		return Reading{}, err
 	}
 	logger.Debug("connected", zap.String("sensor", sensor.Name))
 
@@ -96,7 +97,7 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	logger.Debug("discovering profile...", zap.String("sensor", sensor.Name))
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {
-		return r, err
+		return Reading{}, err
 	}
 
 	logger.Debug("finding characteristic...", zap.String("sensor", sensor.Name))
@@ -106,13 +107,15 @@ func (h *Handler) GetReading(sensor Sensor) (Reading, error) {
 	ch := make(chan Reading)
 	err = cln.Subscribe(c, false, h.handleReading(ch))
 	if err != nil {
-		return r, err
+		return Reading{}, err
 	}
+
+	var r Reading
 
 	select {
 	case r = <-ch:
 	case <-done:
-		return r, nil
+		return Reading{}, ErrDisconnectedByDevice
 	}
 
 	logger.Debug("disconnecting...", zap.String("sensor", sensor.Name))
